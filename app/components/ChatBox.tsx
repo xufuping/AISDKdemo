@@ -1,22 +1,40 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { Send, Trash2, Bot, User } from 'lucide-react';
+import { useState, useRef, useEffect } from "react";
+import { Send, Trash2, Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css"; // 代码高亮样式
+import type { Components } from "react-markdown";
+
+// 定义代码组件的 props 类型
+interface CodeProps extends React.HTMLAttributes<HTMLElement> {
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+// 定义链接组件的 props 类型
+interface AnchorProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
+  children?: React.ReactNode;
+  href?: string;
+}
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 自动滚动到底部
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -29,28 +47,35 @@ export default function ChatBox() {
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = { role: "user", content: input };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    setInput('');
+    setInput("");
     setIsLoading(true);
 
     try {
-      // 调用 API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      //   // 调用 API
+      //   const response = await fetch('/api/chat', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({ messages: newMessages }),
+      //   });
+
+      // 改为调用 Python 后端
+      const response = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages }),
       });
 
       if (!response.ok) {
-        throw new Error('请求失败');
+        throw new Error("请求失败");
       }
 
       // 处理流式响应
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      let assistantMessage = '';
+      let assistantMessage = "";
 
       if (reader) {
         while (true) {
@@ -63,17 +88,17 @@ export default function ChatBox() {
           // 实时更新消息
           setMessages([
             ...newMessages,
-            { role: 'assistant', content: assistantMessage },
+            { role: "assistant", content: assistantMessage },
           ]);
         }
       }
     } catch (error) {
-      console.error('发送消息错误:', error);
+      console.error("发送消息错误:", error);
       setMessages([
         ...newMessages,
         {
-          role: 'assistant',
-          content: '抱歉，出现了一些问题。请稍后再试。',
+          role: "assistant",
+          content: "抱歉，出现了一些问题。请稍后再试。",
         },
       ]);
     } finally {
@@ -92,7 +117,7 @@ export default function ChatBox() {
    * 处理键盘事件
    */
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
@@ -105,7 +130,7 @@ export default function ChatBox() {
         <div className="flex items-center gap-3">
           <Bot className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-            AI 聊天机器人
+            无所不能冉思月
           </h1>
         </div>
         {messages.length > 0 && (
@@ -136,26 +161,71 @@ export default function ChatBox() {
             <div
               key={index}
               className={`flex gap-3 ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
+                message.role === "user" ? "justify-end" : "justify-start"
               }`}
             >
-              {message.role === 'assistant' && (
+              {message.role === "assistant" && (
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center">
                   <Bot className="w-5 h-5 text-white" />
                 </div>
               )}
               <div
                 className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50'
+                  message.role === "user"
+                    ? "bg-blue-600 text-white"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50"
                 }`}
               >
-                <p className="whitespace-pre-wrap break-words">
+                {/* <p className="whitespace-pre-wrap break-words">
                   {message.content}
-                </p>
+                </p> */}
+
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight]}
+                    components={
+                      {
+                        code: ({
+                          inline,
+                          className,
+                          children,
+                          ...props
+                        }: CodeProps) => {
+                          return inline ? (
+                            <code
+                              className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-sm font-mono"
+                              {...props}
+                            >
+                              {children}
+                            </code>
+                          ) : (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
+                        },
+                        // 自定义链接样式
+                        a: ({ children, ...props }: AnchorProps) => {
+                          return (
+                            <a
+                              className="text-blue-600 dark:text-blue-400 hover:underline"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              {...props}
+                            >
+                              {children}
+                            </a>
+                          );
+                        },
+                      } as Components
+                    }
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
               </div>
-              {message.role === 'user' && (
+              {message.role === "user" && (
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-700 dark:bg-zinc-600 flex items-center justify-center">
                   <User className="w-5 h-5 text-white" />
                 </div>
